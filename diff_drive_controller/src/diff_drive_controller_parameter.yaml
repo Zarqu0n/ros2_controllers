@@ -176,6 +176,14 @@ diff_drive_controller:
         type: double,
         default_value: .NAN,
       }
+      deceleration: {
+        type: double,
+        default_value: .NAN,
+      }
+      acceleration: {
+        type: double,
+        default_value: .NAN,
+      }
       max_jerk: {
         type: double,
         default_value: .NAN,

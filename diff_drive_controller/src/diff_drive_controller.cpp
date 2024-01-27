@@ -60,6 +60,7 @@ controller_interface::CallbackReturn DiffDriveController::on_init()
     // Create the parameter listener and get the parameters
     param_listener_ = std::make_shared<ParamListener>(get_node());
     params_ = param_listener_->get_params();
+    RCLCPP_INFO(get_node()->get_logger(), "Parameters were loaded");
   }
   catch (const std::exception & e)
   {
@@ -116,11 +117,26 @@ controller_interface::return_type DiffDriveController::update(
   }
 
   if (use_deceleration_){
-    limiter_linear_.min_acceleration_ = deceleration_;
+    limiter_linear_.min_acceleration_ = -abs(deceleration_);
   }
   else{
     limiter_linear_.min_acceleration_ = params_.linear.x.min_acceleration;
   }
+
+  if (angular_acceleration_ != 0.0){
+    limiter_angular_.min_acceleration_ = -abs(angular_acceleration_);
+  }
+  else{
+    limiter_angular_.min_acceleration_ = params_.angular.z.min_acceleration;
+  }
+
+  if (angular_deceleration_ != 0.0){
+    limiter_angular_.max_acceleration_ = abs(angular_deceleration_);
+  }
+  else{
+    limiter_angular_.max_acceleration_ = params_.angular.z.max_acceleration;
+  }
+
   std::shared_ptr<Twist> last_command_msg;
   received_velocity_msg_ptr_.get(last_command_msg);
 
@@ -313,7 +329,7 @@ controller_interface::CallbackReturn DiffDriveController::on_configure(
   publish_limited_velocity_ = params_.publish_limited_velocity;
   use_stamped_vel_ = params_.use_stamped_vel;
   deceleration_ = params_.linear.x.deceleration;
-
+  angular_deceleration_ = params_.angular.z.deceleration;
   limiter_linear_ = SpeedLimiter(
     params_.linear.x.has_velocity_limits, params_.linear.x.has_acceleration_limits,
     params_.linear.x.has_jerk_limits, params_.linear.x.min_velocity, params_.linear.x.max_velocity,
@@ -532,7 +548,16 @@ rcl_interfaces::msg::SetParametersResult DiffDriveController::on_param_change(co
       // if (!use_deceleration_){
       //   RCLCPP_WARN(get_node()->get_logger(), "Deceleration is not used, set use_deceleration to true to use it");
       // }
-
+    }
+    if (parameter.get_name() == "angular.z.deceleration"){
+      angular_deceleration_ = parameter.as_double();
+      // RCLCPP_WARN(get_node()->get_logger(), "angular.z.deceleration changed to: %f", parameter.as_double());
+      result.successful = true;
+    }
+    if (parameter.get_name() == "angular.z.acceleration"){
+      angular_acceleration_ = parameter.as_double();
+      // RCLCPP_WARN(get_node()->get_logger(), "angular.z.acceleration changed to: %f", parameter.as_double());
+      result.successful = true;
     }
     if (parameter.get_name() == "use_deceleration"){
       // RCLCPP_WARN(get_node()->get_logger(), "use_deceleration changed to: %d", parameter.as_bool());
